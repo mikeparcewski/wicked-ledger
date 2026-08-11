@@ -1,0 +1,32 @@
+# wicked-ledger — Release caller.
+# Single-package-at-root repo. Node-only smoke test (createDomainStore migration
+# round-trip + oracle query) gates the publish; native better-sqlite3 must build
+# on every matrix OS. Sync PR keeps package.json on main in step with the tag.
+#
+# First-publish note: wicked-ledger is a brand-new npm name. Tokenless OIDC
+# "trusted publishing" requires the trusted publisher to be pre-registered on
+# npmjs.com, which cannot be done before the package exists. If the first
+# release fails at the publish step on auth/OIDC, either (a) register the
+# trusted publisher for wicked-ledger on npm and re-run, or (b) flip the caller
+# to `use_npm_token: true` (the shared workflow's opt-in path) with an NPM_TOKEN
+# secret for a one-time bootstrap publish, then revert to OIDC.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  pull-requests: write
+
+jobs:
+  release:
+    uses: mikeparcewski/wicked-ci/.github/workflows/node-release.yml@d8c9b0a14fb91c2d13f5da0468eeeff983c27e5a # v1.1.2
+    with:
+      package_name: wicked-ledger
+      enable_sync_pr: true
+    secrets: inherit
