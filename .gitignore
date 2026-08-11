@@ -1,0 +1,13 @@
+node_modules/
+*.log
+npm-debug.log*
+.DS_Store
+*.tgz
+.wicked-testing/
+.wicked-ledger/
+*.db
+*.db-wal
+*.db-shm
+coverage/
+.env
+.env.*

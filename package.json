@@ -1,0 +1,57 @@
+{
+  "name": "wicked-ledger",
+  "version": "0.1.0",
+  "description": "Infra: the wicked evidence ledger — verdict/run/scenario DomainStore + oracle queries + additive SQLite migrations. Shared by QE writers and gate readers.",
+  "type": "module",
+  "exports": {
+    ".": "./lib/index.mjs",
+    "./domain-store": "./lib/domain-store.mjs",
+    "./oracle-queries": "./lib/oracle-queries.mjs",
+    "./manifest": "./lib/manifest.mjs",
+    "./migrate": "./lib/migrate.mjs",
+    "./bus-emit": "./lib/bus-emit.mjs",
+    "./package.json": "./package.json"
+  },
+  "main": "./lib/index.mjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "MIT",
+  "author": "Mike Parcewski",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikeparcewski/wicked-ledger.git"
+  },
+  "homepage": "https://github.com/mikeparcewski/wicked-ledger#readme",
+  "bugs": {
+    "url": "https://github.com/mikeparcewski/wicked-ledger/issues"
+  },
+  "keywords": [
+    "evidence",
+    "ledger",
+    "verdict",
+    "domain-store",
+    "sqlite",
+    "better-sqlite3",
+    "migrations",
+    "local-first",
+    "ai-agents",
+    "developer-tools",
+    "qe",
+    "acceptance-testing"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "lib/",
+    "docs/",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.0"
+  }
+}
