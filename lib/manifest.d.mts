@@ -1,13 +1,13 @@
 /**
  * Type declarations for lib/manifest.mjs — evidence-manifest builder.
  *
- * Hand-authored against the runtime module and schemas the manifest is
- * contractually bound to (wicked-testing's schemas/evidence.json and
- * docs/EVIDENCE.md). Keep in lockstep with lib/manifest.mjs — CI runs
+ * Hand-authored against the runtime module and the evidence-manifest schema
+ * the builder is contractually bound to (schemas/evidence.json in wicked-vault
+ * and docs/EVIDENCE.md — inherited from the retired wicked-testing package). Keep in lockstep with lib/manifest.mjs — CI runs
  * `npm run typecheck` against test/types/consumer.mts so drift fails loudly.
  */
 
-/** Semver of the manifest schema this builder emits (e.g. "1.1.0"). */
+/** Semver of the manifest schema this builder emits (e.g. "2.0.0"). */
 export const MANIFEST_VERSION: string;
 
 /**
@@ -83,7 +83,8 @@ export interface ManifestEnvironment {
   os: string;
   node?: string;
   cli?: string;
-  wicked_testing_version: string;
+  /** QE toolchain version (was `wicked_testing_version` in manifest 1.x). */
+  qe_version: string;
 }
 
 /** The recorded verdict block of the manifest. */
@@ -108,7 +109,8 @@ export interface ManifestAssertion {
 /**
  * The public evidence manifest — the one artifact downstream consumers
  * (crew gates, dashboards) read. Written to
- * `.wicked-testing/evidence/<run-id>/manifest.json`.
+ * `<ledger-root>/evidence/<run-id>/manifest.json` (root `.wicked-qe/`, or a
+ * legacy `.wicked-testing/`).
  */
 export interface EvidenceManifest {
   manifest_version: string;
@@ -175,8 +177,10 @@ export interface BuildManifestOptions {
   verdictRecord: BuildManifestVerdictRecord;
   /** Absolute path to the run's evidence dir (created if absent). */
   evidenceDir: string;
-  /** e.g. "0.2.0" — lands in environment.wicked_testing_version. */
-  wickedTestingVersion: string;
+  /** QE toolchain version — lands in environment.qe_version. */
+  qeVersion?: string;
+  /** Legacy alias for qeVersion (pre-6c callers); one of the two is required. */
+  wickedTestingVersion?: string;
   /** Optional host CLI name ("claude", "gemini", ...). */
   cli?: string;
   /** Basenames to skip in the artifacts walk. Default: ["manifest.json", "context.md"]. */

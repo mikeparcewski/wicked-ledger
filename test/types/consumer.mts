@@ -2,7 +2,7 @@
  * test/types/consumer.mts — consumer-shaped typecheck fixture.
  *
  * Imports EVERY symbol declared by the hand-authored lib/*.d.mts files the
- * way a downstream strict-TS consumer (wicked-crew, wicked-testing) would,
+ * way a downstream strict-TS consumer (wicked-crew, wicked-garden qe) would,
  * and exercises the key signatures. `npm run typecheck` compiles this with
  * `tsc --noEmit` under strict nodenext resolution; if the declarations drift
  * from the surface this file uses, CI fails loudly.
@@ -93,7 +93,7 @@ function expectType<T>(_value: T): void {}
 export function _domainStoreSurface(): void {
   expectType<number>(SCHEMA_VERSION);
 
-  const store: DomainStore = createDomainStore({ root: "/tmp/.wicked-testing" });
+  const store: DomainStore = createDomainStore({ root: "/tmp/.wicked-qe" });
   expectType<DomainStore>(createDomainStore());
   expectType<DomainStore>(createDomainStoreDefault({ root: "." }));
   expectType<DomainStore>(dsDefault());
@@ -197,7 +197,7 @@ export function _manifestSurface(): void {
     scenarioRecord,
     verdictRecord,
     evidenceDir: "/tmp/evidence/run-1",
-    wickedTestingVersion: "0.2.0",
+    qeVersion: "0.2.0",
     cli: "claude",
     excludeFiles: ["manifest.json"],
   };

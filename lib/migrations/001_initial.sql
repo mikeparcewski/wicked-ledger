@@ -1,6 +1,7 @@
--- wicked-testing migration 001: initial 7-table schema
+-- wicked-ledger migration 001: initial 7-table schema
 -- Applied automatically by DomainStore on first open.
--- To apply manually: sqlite3 .wicked-testing/wicked-testing.db < lib/migrations/001_initial.sql
+-- To apply manually: sqlite3 .wicked-qe/wicked-qe.db < lib/migrations/001_initial.sql
+-- (legacy stores: sqlite3 .wicked-testing/wicked-testing.db < lib/migrations/001_initial.sql)
 
 CREATE TABLE IF NOT EXISTS projects (
   id           TEXT PRIMARY KEY,
