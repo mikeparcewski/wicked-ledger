@@ -128,14 +128,20 @@ export interface EvidenceManifest {
   assertions?: ManifestAssertion[];
 }
 
-/** `runs` row subset consumed by buildManifest(). A DomainStore RunRecord satisfies this. */
+/**
+ * `runs` row subset consumed by buildManifest(). A DomainStore RunRecord
+ * satisfies this. project_id / scenario_id / started_at are required — the
+ * manifest schema requires them, and an undefined value would silently drop
+ * the key from the written manifest.json.
+ */
 export interface BuildManifestRunRecord {
   id: string;
-  project_id?: string;
-  scenario_id?: string;
-  started_at?: string | null;
+  project_id: string;
+  scenario_id: string;
+  started_at: string;
+  /** May be absent on errored/crashed runs; duration_ms falls back to 0. */
   finished_at?: string | null;
-  /** Must be a terminal RunStatus by manifest time; "running" fails shape validation. */
+  /** Defaults to "errored" when absent. Must be a terminal RunStatus by manifest time; "running" fails shape validation. */
   status?: RunLifecycleStatus;
   evidence_path?: string | null;
 }

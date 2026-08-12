@@ -119,8 +119,13 @@ export type CreateInput<T extends TableName> =
   Omit<TableRecordMap[T], keyof BaseRecord> &
   Partial<Pick<BaseRecord, "id" | "created_at" | "updated_at">>;
 
-/** update() diff: any subset of the record's fields (updated_at is stamped by the store). */
-export type UpdateInput<T extends TableName> = Partial<Omit<TableRecordMap[T], "id" | "created_at">>;
+/**
+ * update() diff: any subset of the record's DOMAIN fields. Store-stamped
+ * fields are excluded — updated_at is always stamped by the store (a
+ * supplied value is overridden), and soft-deletion goes through the
+ * dedicated delete() API, not an update diff.
+ */
+export type UpdateInput<T extends TableName> = Partial<Omit<TableRecordMap[T], keyof BaseRecord>>;
 
 /** list()/search() equality filters — non-schema keys are ignored (column allowlist). */
 export type ListParams<T extends TableName> = Partial<TableRecordMap[T]>;
