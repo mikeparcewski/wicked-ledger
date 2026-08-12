@@ -192,7 +192,15 @@ export class DomainStore {
  *   `<cwd>/.wicked-qe`, falling back to a legacy `<cwd>/.wicked-testing` when
  *   only that exists).
  */
-export function createDomainStore(opts?: { root?: string }): DomainStore;
+export function createDomainStore(opts?: {
+  root?: string;
+  /**
+   * Environment override for the WICKED_RUNTIME profile check (default:
+   * process.env). Throws ERR_WICKED_RUNTIME_TEAM_UNSUPPORTED under
+   * WICKED_RUNTIME=team — no shared-store driver exists yet (lib/runtime.mjs).
+   */
+  env?: Record<string, string | undefined>;
+}): DomainStore;
 
 /** Current on-disk ledger dirname (".wicked-qe"). */
 export const LEDGER_DIRNAME: string;

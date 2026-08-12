@@ -28,6 +28,10 @@
       "types": "./lib/bus-emit.d.mts",
       "default": "./lib/bus-emit.mjs"
     },
+    "./runtime": {
+      "types": "./lib/runtime.d.mts",
+      "default": "./lib/runtime.mjs"
+    },
     "./package.json": "./package.json"
   },
   "main": "./lib/index.mjs",

@@ -36,6 +36,8 @@ import {
   applyMigrations,
   listMigrations,
   domainEventToBusEvent,
+  resolveRuntimeProfile,
+  assertRuntimeSupported,
 } from "../lib/index.mjs";
 
 const require = createRequire(import.meta.url);
@@ -57,6 +59,34 @@ function check(label, fn) {
 
 const root = mkdtempSync(join(tmpdir(), "wicked-ledger-smoke-"));
 process.stdout.write(`# smoke root: ${root}\n`);
+
+// --- WICKED_RUNTIME seam (env passed explicitly — no process.env mutation) ---
+check("runtime profile defaults to local (unset / empty / explicit)", () => {
+  assert.deepEqual(resolveRuntimeProfile({}), { runtime: "local", storeUrl: undefined });
+  assert.equal(resolveRuntimeProfile({ WICKED_RUNTIME: "" }).runtime, "local");
+  assert.equal(resolveRuntimeProfile({ WICKED_RUNTIME: "LOCAL" }).runtime, "local");
+});
+
+check("unrecognized WICKED_RUNTIME fails loud (never a silent local fallback)", () => {
+  assert.throws(
+    () => resolveRuntimeProfile({ WICKED_RUNTIME: "prod" }),
+    (err) => err.code === "ERR_WICKED_RUNTIME_INVALID",
+  );
+});
+
+check("WICKED_RUNTIME=team fails loud: no shared-store driver exists yet", () => {
+  assert.throws(
+    () => assertRuntimeSupported({ WICKED_RUNTIME: "team", WICKED_STORE_URL: "postgres://x/y" }),
+    (err) => err.code === "ERR_WICKED_RUNTIME_TEAM_UNSUPPORTED",
+  );
+});
+
+check("createDomainStore refuses to open a local store under a team profile", () => {
+  assert.throws(
+    () => createDomainStore({ root, env: { WICKED_RUNTIME: "team" } }),
+    (err) => err.code === "ERR_WICKED_RUNTIME_TEAM_UNSUPPORTED",
+  );
+});
 
 try {
   __resetDomainStoreCacheForTests();

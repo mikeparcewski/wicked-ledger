@@ -30,6 +30,8 @@ import createDomainStoreDefault, {
   emitBusEvent,
   domainEventToBusEvent,
   __resetBusAvailabilityForTests,
+  resolveRuntimeProfile,
+  assertRuntimeSupported,
 } from "wicked-ledger";
 
 import type {
@@ -78,6 +80,9 @@ import type {
   LedgerBusEventType,
   LedgerBusEvent,
   DomainAction,
+  // runtime-profile types
+  RuntimeProfile,
+  RuntimeProfileName,
 } from "wicked-ledger";
 
 // --- Subpath entries resolve their own declarations ---
@@ -86,6 +91,7 @@ import oracleDefault, { buildOracleQuery as boq2, QUERIES as Q2 } from "wicked-l
 import { buildManifest as bm2, VERDICT_VALUES as VV2, MANIFEST_VERSION as MV2 } from "wicked-ledger/manifest";
 import { applyMigrations as am2, listMigrations as lm2 } from "wicked-ledger/migrate";
 import { emitBusEvent as ebe2, domainEventToBusEvent as detbe2, __resetBusAvailabilityForTests as rba2 } from "wicked-ledger/bus-emit";
+import { resolveRuntimeProfile as rrp2, assertRuntimeSupported as ars2 } from "wicked-ledger/runtime";
 
 function expectType<T>(_value: T): void {}
 
@@ -246,4 +252,16 @@ export function _busSurface(): void {
   expectType<LedgerBusEvent | LedgerBusEvent[] | null>(detbe2("delete", "runs", null, "0.1.1"));
   __resetBusAvailabilityForTests();
   rba2();
+}
+
+export function _runtimeSurface(): void {
+  const profile: RuntimeProfile = resolveRuntimeProfile();
+  expectType<RuntimeProfileName>(profile.runtime);
+  expectType<string | undefined>(profile.storeUrl);
+  expectType<RuntimeProfile>(resolveRuntimeProfile({ WICKED_RUNTIME: "local" }));
+  expectType<RuntimeProfile>(assertRuntimeSupported({ WICKED_RUNTIME: "local" }));
+  expectType<RuntimeProfile>(rrp2({}));
+  expectType<RuntimeProfile>(ars2());
+  // createDomainStore accepts the env override for the runtime check.
+  expectType<DomainStore>(createDomainStore({ root: ".", env: { WICKED_RUNTIME: "local" } }));
 }
