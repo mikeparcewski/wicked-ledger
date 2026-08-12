@@ -1,10 +1,10 @@
--- wicked-testing migration 003: vault_payload_sha on verdicts
+-- wicked-ledger migration 003: vault_payload_sha on verdicts
 -- Applied automatically by DomainStore (lib/migrate.mjs) in numeric order,
 -- inside its own transaction. Pure DDL — do NOT write into schema_migrations
 -- here; the runner records the version row after exec() succeeds.
 --
 -- Wires verdict records to vault's content-addressed payload store.
--- When wicked-vault record() is called alongside a wicked-testing verdict,
+-- When wicked-vault record() is called alongside a qe verdict,
 -- the resulting payload_sha256 from the vault is stored here so downstream
 -- consumers can verify the artifact without re-reading the evidence directory.
 --

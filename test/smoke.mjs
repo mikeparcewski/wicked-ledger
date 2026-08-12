@@ -1,7 +1,7 @@
 /**
  * test/smoke.mjs — wicked-ledger smoke test.
  *
- * Proves the extracted ledger works end to end without any wicked-testing
+ * Proves the extracted ledger works end to end without any external
  * context:
  *   1. every public module imports (parse + link check);
  *   2. createDomainStore runs the migrations clean against a fresh tmp dir;
@@ -15,13 +15,16 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 
 import {
   createDomainStore,
+  resolveLedgerRoot,
+  LEDGER_DIRNAME,
+  LEGACY_LEDGER_DIRNAME,
   SCHEMA_VERSION,
   __resetDomainStoreCacheForTests,
   buildOracleQuery,
@@ -135,7 +138,7 @@ try {
 
   // 3. Oracle query executes against the real, migrated schema and returns
   //    the row we just wrote. Open a second read connection on the same db.
-  const dbPath = join(root, "wicked-testing.db");
+  const dbPath = join(root, "wicked-qe.db");
   check("db file exists on disk", () => assert.ok(existsSync(dbPath), dbPath));
 
   check("oracle buildOracleQuery('last_verdict_for_scenario') returns the verdict", () => {
@@ -189,18 +192,44 @@ try {
       scenarioRecord: scenario,
       verdictRecord: verdict,
       evidenceDir: join(root, "evidence", "smoke-run"),
-      wickedTestingVersion: "0.1.0",
+      qeVersion: "0.2.0",
     });
     assert.equal(manifest.manifest_version, MANIFEST_VERSION);
     assert.equal(manifest.verdict.value, "PASS");
     assert.equal(manifest.status, "passed");
+    assert.equal(manifest.environment.qe_version, "0.2.0");
     assert.ok(existsSync(path), "manifest not written");
   });
 
   // 5. Bus mapping is pure + present (no wicked-bus binary required).
   check("domainEventToBusEvent maps a verdict create", () => {
-    const ev = domainEventToBusEvent("create", "verdicts", verdict, "0.1.0");
+    const ev = domainEventToBusEvent("create", "verdicts", verdict, "0.2.0");
     assert.ok(ev && ev.type === "wicked.test.verdict.created");
+    assert.equal(ev.payload.qe_version, "0.2.0");
+  });
+
+  check("resolveLedgerRoot dual-read: new name wins, legacy honored, default new", () => {
+    const base = join(root, "resolve-bed");
+    mkdirSync(base, { recursive: true });
+    // no dirs: default to the new name
+    assert.equal(resolveLedgerRoot(base), join(base, LEDGER_DIRNAME));
+    // legacy only: legacy root is honored
+    mkdirSync(join(base, LEGACY_LEDGER_DIRNAME), { recursive: true });
+    assert.equal(resolveLedgerRoot(base), join(base, LEGACY_LEDGER_DIRNAME));
+    // both present: the new name wins
+    mkdirSync(join(base, LEDGER_DIRNAME), { recursive: true });
+    assert.equal(resolveLedgerRoot(base), join(base, LEDGER_DIRNAME));
+  });
+
+  check("buildManifest accepts the legacy wickedTestingVersion alias", () => {
+    const { manifest } = buildManifest({
+      runRecord: finishedRun,
+      scenarioRecord: scenario,
+      verdictRecord: verdict,
+      evidenceDir: join(root, "evidence", "smoke-run-legacy"),
+      wickedTestingVersion: "0.1.0",
+    });
+    assert.equal(manifest.environment.qe_version, "0.1.0");
   });
 
   store.close();

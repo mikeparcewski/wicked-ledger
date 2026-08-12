@@ -1,4 +1,4 @@
--- wicked-testing migration 002: verdict CHECK constraint + equivalence provenance
+-- wicked-ledger migration 002: verdict CHECK constraint + equivalence provenance
 -- Applied automatically by DomainStore (lib/migrate.mjs) in numeric order,
 -- inside its own transaction. Pure DDL — do NOT write into schema_migrations
 -- here; the runner records the version row after exec() succeeds.
