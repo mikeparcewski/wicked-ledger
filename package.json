@@ -1,18 +1,37 @@
 {
   "name": "wicked-ledger",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Infra: the wicked evidence ledger — verdict/run/scenario DomainStore + oracle queries + additive SQLite migrations. Shared by QE writers and gate readers.",
   "type": "module",
   "exports": {
-    ".": "./lib/index.mjs",
-    "./domain-store": "./lib/domain-store.mjs",
-    "./oracle-queries": "./lib/oracle-queries.mjs",
-    "./manifest": "./lib/manifest.mjs",
-    "./migrate": "./lib/migrate.mjs",
-    "./bus-emit": "./lib/bus-emit.mjs",
+    ".": {
+      "types": "./lib/index.d.mts",
+      "default": "./lib/index.mjs"
+    },
+    "./domain-store": {
+      "types": "./lib/domain-store.d.mts",
+      "default": "./lib/domain-store.mjs"
+    },
+    "./oracle-queries": {
+      "types": "./lib/oracle-queries.d.mts",
+      "default": "./lib/oracle-queries.mjs"
+    },
+    "./manifest": {
+      "types": "./lib/manifest.d.mts",
+      "default": "./lib/manifest.mjs"
+    },
+    "./migrate": {
+      "types": "./lib/migrate.d.mts",
+      "default": "./lib/migrate.mjs"
+    },
+    "./bus-emit": {
+      "types": "./lib/bus-emit.d.mts",
+      "default": "./lib/bus-emit.mjs"
+    },
     "./package.json": "./package.json"
   },
   "main": "./lib/index.mjs",
+  "types": "./lib/index.d.mts",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -49,9 +68,14 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node test/smoke.mjs"
+    "test": "node test/smoke.mjs",
+    "typecheck": "tsc -p test/types/tsconfig.json"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.6.0"
   }
 }
