@@ -1,0 +1,19 @@
+# wicked-ledger — CI caller.
+# Full 3-OS default matrix: the native better-sqlite3 dep must build on every
+# platform the release gate covers. `npm run typecheck` compiles
+# test/types/consumer.mts (a consumer-shaped file importing every symbol the
+# hand-authored lib/*.d.mts declarations export) with tsc --noEmit, so the
+# type declarations cannot drift from the runtime surface silently.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    uses: mikeparcewski/wicked-ci/.github/workflows/node-ci.yml@d8c9b0a14fb91c2d13f5da0468eeeff983c27e5a # v1.1.2
+    with:
+      test_cmd: 'npm test && npm run typecheck'
