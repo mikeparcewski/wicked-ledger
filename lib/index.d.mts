@@ -32,6 +32,10 @@ export type {
   DomainStoreStats,
 } from "./domain-store.mjs";
 
+// --- WICKED_RUNTIME profile resolution (foundation team-profile seam) ---
+export { resolveRuntimeProfile, assertRuntimeSupported } from "./runtime.mjs";
+export type { RuntimeProfile, RuntimeProfileName } from "./runtime.mjs";
+
 // --- Oracle: fixed parameterized query library (no LLM-generated SQL) ---
 export {
   QUERIES,
