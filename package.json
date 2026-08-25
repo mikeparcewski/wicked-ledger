@@ -1,6 +1,6 @@
 {
   "name": "wicked-ledger",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Infra: the wicked evidence ledger \u2014 verdict/run/scenario DomainStore + oracle queries + additive SQLite migrations. Shared by QE writers and gate readers.",
   "type": "module",
   "exports": {
