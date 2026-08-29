@@ -69,7 +69,7 @@ Import everything from the package root, or a single module by subpath.
 | `createDomainStore(opts)` / `DomainStore` | `wicked-ledger/domain-store` | Dual-write store for `projects` / `strategies` / `scenarios` / `runs` / `verdicts` / `tasks`. `create` / `get` / `list` / `update` / `delete` / `search` / `stats` / `rebuildIndex` / `schemaVersion` / `close`. Singleton per resolved root. |
 | `SCHEMA_VERSION` | `wicked-ledger/domain-store` | The schema version this code targets (`3`). Must equal the highest migration. |
 | `buildOracleQuery(name, filters)`, `routeQuestion(q, filters)`, `QUERIES`, `QUERY_NAMES`, `supportedPatterns()` | `wicked-ledger/oracle-queries` | 13 named, parameterized read queries + a keyword router. Every query is a plain auditable `SELECT`. |
-| `buildManifest(opts)`, `MANIFEST_VERSION`, `VERDICT_VALUES` | `wicked-ledger/manifest` | Builds the public evidence `manifest.json` for a run; the single verdict-enum source of truth. |
+| `buildManifest(opts)`, `validateManifest(m)`, `MANIFEST_VERSION`, `VERDICT_VALUES`, `CLAIM_LEVELS` | `wicked-ledger/manifest` | Builds the public evidence `manifest.json` for a run (manifest `2.1.0`: optional `scenario_evidence` block + `claim_level` enum); the single verdict-enum and claim-level source of truth. `validateManifest` is the reviewer-side check — validate before grading, schema-fail = `INCONCLUSIVE`. |
 | `applyMigrations(db, dir)`, `listMigrations(dir)` | `wicked-ledger/migrate` | Versioned migration runner (used internally by the store; exposed for tooling / dry-runs). |
 | `emitBusEvent(type, payload)`, `domainEventToBusEvent(action, source, record, version)` | `wicked-ledger/bus-emit` | Fire-and-forget `wicked-bus` emission. No-ops when the `wicked-bus` binary is absent; never throws. |
 
@@ -86,7 +86,10 @@ and is **additive-only**. A newer writer never breaks an older reader.
 
 See **[docs/SCHEMA-CONTRACT.md](docs/SCHEMA-CONTRACT.md)** for the version
 mechanism, the additive-only rule, and the "min reader schema floor" guidance
-that lets a garden writer and a crew reader agree across package-version skew.
+that lets a garden writer and a crew reader agree across package-version skew —
+plus the second contract the ledger owns: the **evidence-manifest format**
+(`manifest_version`, currently **2.1.0**) and the reviewer-validates-before-
+grading rule.
 
 ## Test
 

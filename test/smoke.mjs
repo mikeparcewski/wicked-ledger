@@ -31,8 +31,10 @@ import {
   routeQuestion,
   QUERY_NAMES,
   buildManifest,
+  validateManifest,
   MANIFEST_VERSION,
   VERDICT_VALUES,
+  CLAIM_LEVELS,
   applyMigrations,
   listMigrations,
   domainEventToBusEvent,
@@ -249,6 +251,115 @@ try {
     // both present: the new name wins
     mkdirSync(join(base, LEDGER_DIRNAME), { recursive: true });
     assert.equal(resolveLedgerRoot(base), join(base, LEDGER_DIRNAME));
+  });
+
+  // --- manifest 2.1: scenario_evidence + claim_level (TH-5) ---
+  check("manifest 2.1: buildManifest carries a conforming scenario_evidence block", () => {
+    assert.equal(MANIFEST_VERSION, "2.1.0");
+    assert.deepEqual([...CLAIM_LEVELS], ["certified", "machinery-verified", "skipped"]);
+    const { manifest } = buildManifest({
+      runRecord: finishedRun,
+      scenarioRecord: scenario,
+      verdictRecord: verdict,
+      evidenceDir: join(root, "evidence", "smoke-run-21"),
+      qeVersion: "0.4.0",
+      scenarioEvidence: {
+        scenario: "S11 — terminal state + evidence bundle + acceptance read",
+        status: "PASS",
+        claim_level: "machinery-verified",
+        ui_steps: ["Run page shows Completed terminal badge"],
+        screenshots: ["S11-terminal-run.png"],
+        wire_evidence: { "GET /runs/:id/events": "157 events captured" },
+        db_evidence: "event store ndjson tail sessionCompleted seq 513",
+        terminal_state_proof: "sessionCompleted in the durable log + Completed badge",
+        notes: ["acceptance leg API-substituted (disclosed)"],
+        legs: [
+          { leg: "ui", claim_level: "certified" },
+          { leg: "acceptance", claim_level: "machinery-verified", reason: "API-only by design" },
+        ],
+      },
+    });
+    assert.equal(manifest.manifest_version, "2.1.0");
+    assert.equal(manifest.scenario_evidence.claim_level, "machinery-verified");
+    assert.equal(manifest.scenario_evidence.legs.length, 2);
+    // the written manifest re-validates clean (reviewer path)
+    const res = validateManifest(manifest);
+    assert.equal(res.ok, true, JSON.stringify(res.violations));
+  });
+
+  check("manifest 2.1: nonconforming scenario_evidence fails loud in buildManifest", () => {
+    assert.throws(
+      () => buildManifest({
+        runRecord: finishedRun,
+        scenarioRecord: scenario,
+        verdictRecord: verdict,
+        evidenceDir: join(root, "evidence", "smoke-run-21-bad"),
+        qeVersion: "0.4.0",
+        scenarioEvidence: { scenario: "S1", status: "PASS", claim_level: "vibes" },
+      }),
+      /invalid claim_level 'vibes'/,
+    );
+  });
+
+  check("manifest 2.1: honest-cap invariant — overall claim can't beat the weakest leg", () => {
+    assert.throws(
+      () => buildManifest({
+        runRecord: finishedRun,
+        scenarioRecord: scenario,
+        verdictRecord: verdict,
+        evidenceDir: join(root, "evidence", "smoke-run-21-cap"),
+        qeVersion: "0.4.0",
+        scenarioEvidence: {
+          scenario: "S7",
+          status: "PASS",
+          claim_level: "certified", // stronger than the machinery-verified leg
+          legs: [{ leg: "graph-wires", claim_level: "machinery-verified" }],
+        },
+      }),
+      /stronger than the weakest leg/,
+    );
+  });
+
+  check("validateManifest: a nonconforming bundle validates as nonconforming (reviewer → INCONCLUSIVE)", () => {
+    // reviewer-side path: an off-disk bundle that never went through buildManifest
+    const bundle = {
+      manifest_version: "2.1.0",
+      run_id: "r-1", project_id: "p-1", scenario_id: "s-1", scenario_name: "x",
+      started_at: "2026-08-29T00:00:00Z", finished_at: "2026-08-29T00:01:00Z",
+      duration_ms: 60000, status: "passed",
+      verdict: { value: "PASS", reviewer: "r", recorded_at: "2026-08-29T00:01:01Z" },
+      environment: { os: "test", qe_version: "0.4.0" },
+      artifacts: [],
+      scenario_evidence: {
+        scenario: "S2",
+        status: "PASS",
+        claim_level: "skipped",
+        ui_steps: "not-an-array", // type violation
+        legs: [{ leg: "", claim_level: "certified" }], // empty leg name
+      },
+    };
+    const res = validateManifest(bundle);
+    assert.equal(res.ok, false);
+    const fields = res.violations.map((v) => v.field);
+    assert.ok(fields.includes("scenario_evidence.ui_steps"), fields.join(","));
+    assert.ok(fields.includes("scenario_evidence.legs[0].leg"), fields.join(","));
+    // non-throwing contract: garbage input reports, never throws
+    assert.equal(validateManifest(null).ok, false);
+    assert.equal(validateManifest("nope").ok, false);
+  });
+
+  check("validateManifest: a 2.0.0 bundle (no scenario_evidence) stays valid", () => {
+    const bundle = {
+      manifest_version: "2.0.0",
+      run_id: "r-2", project_id: "p-1", scenario_id: "s-1", scenario_name: "x",
+      started_at: "2026-08-29T00:00:00Z", finished_at: "2026-08-29T00:01:00Z",
+      duration_ms: 60000, status: "passed",
+      verdict: { value: "PASS", reviewer: "r", recorded_at: "2026-08-29T00:01:01Z" },
+      environment: { os: "test", qe_version: "0.2.0" },
+      artifacts: [],
+    };
+    const res = validateManifest(bundle);
+    assert.equal(res.ok, true, JSON.stringify(res.violations));
   });
 
   check("buildManifest accepts the legacy wickedTestingVersion alias", () => {

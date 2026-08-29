@@ -51,14 +51,17 @@ export type {
   BuiltOracleQuery,
 } from "./oracle-queries.mjs";
 
-// --- Evidence manifest builder + verdict enum ---
+// --- Evidence manifest builder + validator + verdict/claim enums ---
 export {
   buildManifest,
+  validateManifest,
   MANIFEST_VERSION,
   VERDICT_VALUES,
+  CLAIM_LEVELS,
 } from "./manifest.mjs";
 export type {
   Verdict,
+  ClaimLevel,
   RunStatus,
   RunLifecycleStatus,
   EquivalenceMethod,
@@ -68,6 +71,9 @@ export type {
   ManifestEnvironment,
   ManifestVerdict,
   ManifestAssertion,
+  ScenarioEvidenceLeg,
+  ScenarioEvidence,
+  ManifestViolation,
   EvidenceManifest,
   BuildManifestRunRecord,
   BuildManifestScenarioRecord,

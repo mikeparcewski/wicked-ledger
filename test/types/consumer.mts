@@ -23,8 +23,10 @@ import createDomainStoreDefault, {
   buildOracleQuery,
   supportedPatterns,
   buildManifest,
+  validateManifest,
   MANIFEST_VERSION,
   VERDICT_VALUES,
+  CLAIM_LEVELS,
   applyMigrations,
   listMigrations,
   emitBusEvent,
@@ -58,6 +60,7 @@ import type {
   BuiltOracleQuery,
   // manifest types
   Verdict,
+  ClaimLevel,
   RunStatus,
   RunLifecycleStatus,
   EquivalenceMethod,
@@ -67,6 +70,9 @@ import type {
   ManifestEnvironment,
   ManifestVerdict,
   ManifestAssertion,
+  ScenarioEvidenceLeg,
+  ScenarioEvidence,
+  ManifestViolation,
   EvidenceManifest,
   BuildManifestRunRecord,
   BuildManifestScenarioRecord,
@@ -88,7 +94,7 @@ import type {
 // --- Subpath entries resolve their own declarations ---
 import dsDefault, { DomainStore as DS2, createDomainStore as cds2 } from "wicked-ledger/domain-store";
 import oracleDefault, { buildOracleQuery as boq2, QUERIES as Q2 } from "wicked-ledger/oracle-queries";
-import { buildManifest as bm2, VERDICT_VALUES as VV2, MANIFEST_VERSION as MV2 } from "wicked-ledger/manifest";
+import { buildManifest as bm2, validateManifest as vm2, VERDICT_VALUES as VV2, MANIFEST_VERSION as MV2, CLAIM_LEVELS as CL2 } from "wicked-ledger/manifest";
 import { applyMigrations as am2, listMigrations as lm2 } from "wicked-ledger/migrate";
 import { emitBusEvent as ebe2, domainEventToBusEvent as detbe2, __resetBusAvailabilityForTests as rba2 } from "wicked-ledger/bus-emit";
 import { resolveRuntimeProfile as rrp2, assertRuntimeSupported as ars2 } from "wicked-ledger/runtime";
@@ -183,6 +189,8 @@ export function _manifestSurface(): void {
   expectType<string>(MV2);
   expectType<Verdict>(VERDICT_VALUES[0]);
   expectType<Verdict>(VV2[3]);
+  expectType<ClaimLevel>(CLAIM_LEVELS[0]);
+  expectType<ClaimLevel>(CL2[2]);
 
   const runRecord: BuildManifestRunRecord = {
     id: "run-1",
@@ -198,6 +206,22 @@ export function _manifestSurface(): void {
     reviewer: "acceptance-test-reviewer",
     equivalence: { method: "golden-master", matched: true },
   };
+  const legs: ScenarioEvidenceLeg[] = [
+    { leg: "ui", claim_level: "certified" },
+    { leg: "acceptance", claim_level: "machinery-verified", reason: "API-only by design" },
+  ];
+  const scenarioEvidence: ScenarioEvidence = {
+    scenario: "S11 — terminal state + acceptance read",
+    status: "PASS",
+    claim_level: "machinery-verified",
+    ui_steps: ["Completed badge rendered"],
+    screenshots: ["S11-terminal-run.png"],
+    wire_evidence: { events: 157 },
+    db_evidence: "ndjson tail sessionCompleted",
+    terminal_state_proof: "sessionCompleted in the durable log",
+    notes: ["acceptance leg API-substituted (disclosed)"],
+    legs,
+  };
   const opts: BuildManifestOptions = {
     runRecord,
     scenarioRecord,
@@ -206,6 +230,7 @@ export function _manifestSurface(): void {
     qeVersion: "0.2.0",
     cli: "claude",
     excludeFiles: ["manifest.json"],
+    scenarioEvidence,
   };
   const { manifest, path } = buildManifest(opts);
   expectType<EvidenceManifest>(manifest);
@@ -218,7 +243,17 @@ export function _manifestSurface(): void {
   expectType<VerdictEquivalence | undefined>(manifest.verdict.equivalence);
   expectType<EquivalenceMethod | undefined>(manifest.verdict.equivalence?.method);
   expectType<ManifestAssertion[] | undefined>(manifest.assertions);
+  expectType<ScenarioEvidence | undefined>(manifest.scenario_evidence);
+  expectType<ClaimLevel | undefined>(manifest.scenario_evidence?.claim_level);
   expectType<{ manifest: EvidenceManifest; path: string }>(bm2(opts));
+
+  // reviewer-side validation: unknown in, ok + violations out (never throws)
+  const res = validateManifest(JSON.parse("{}"));
+  expectType<boolean>(res.ok);
+  expectType<ManifestViolation[]>(res.violations);
+  expectType<string>(res.violations[0]!.field);
+  expectType<string>(res.violations[0]!.message);
+  expectType<{ ok: boolean; violations: ManifestViolation[] }>(vm2(manifest));
 
   // A DomainStore RunRecord/VerdictRecord feeds buildManifest directly.
   const row = null as unknown as RunRecord;

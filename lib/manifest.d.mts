@@ -7,8 +7,21 @@
  * `npm run typecheck` against test/types/consumer.mts so drift fails loudly.
  */
 
-/** Semver of the manifest schema this builder emits (e.g. "2.0.0"). */
+/** Semver of the manifest schema this builder emits (e.g. "2.1.0"). */
 export const MANIFEST_VERSION: string;
+
+/**
+ * Single source of truth for the claim-level taxonomy (manifest 2.1):
+ * what a PASS is allowed to claim.
+ * - "certified" — the user journey itself was exercised and verified
+ * - "machinery-verified" — a disclosed proxy (e.g. API-substituted step)
+ *   verified the machinery, not the journey
+ * - "skipped" — the leg was not executed (disclosed)
+ */
+export const CLAIM_LEVELS: readonly ["certified", "machinery-verified", "skipped"];
+
+/** A claim level: "certified" | "machinery-verified" | "skipped". */
+export type ClaimLevel = (typeof CLAIM_LEVELS)[number];
 
 /**
  * Single source of truth for the verdict enum. Matches
@@ -106,6 +119,40 @@ export interface ManifestAssertion {
   actual?: string;
 }
 
+/** One leg of a scenario's evidence with its own claim level (manifest 2.1). */
+export interface ScenarioEvidenceLeg {
+  /** Leg name, e.g. "ui", "acceptance", "archive-with-note". */
+  leg: string;
+  claim_level: ClaimLevel;
+  /** Why the leg is capped/skipped (disclosed substitutions). */
+  reason?: string;
+}
+
+/**
+ * Manifest-2.1 scenario_evidence block: the campaign evidence shape proven by
+ * the 2026-08 studio E2E campaign (8 keys) plus the first-class claim_level.
+ * `status` is the EXECUTOR'S CLAIM (verdict taxonomy) — never the verdict of
+ * record; the manifest's top-level `verdict` block stays that. The overall
+ * claim_level may never be stronger than the weakest leg in `legs`
+ * (validated — certify the journey, not the proxy).
+ */
+export interface ScenarioEvidence {
+  /** Scenario title/identifier as executed. */
+  scenario: string;
+  /** Executor's claim, in the verdict taxonomy. */
+  status: Verdict;
+  /** Overall claim level for the scenario (floor of the legs). */
+  claim_level: ClaimLevel;
+  ui_steps?: string[];
+  screenshots?: string[];
+  wire_evidence?: Record<string, unknown> | string;
+  db_evidence?: Record<string, unknown> | string;
+  terminal_state_proof?: string;
+  notes?: string | string[];
+  /** Per-leg claim levels (e.g. an API-substituted acceptance leg). */
+  legs?: ScenarioEvidenceLeg[];
+}
+
 /**
  * The public evidence manifest — the one artifact downstream consumers
  * (crew gates, dashboards) read. Written to
@@ -128,6 +175,8 @@ export interface EvidenceManifest {
   artifacts: ManifestArtifact[];
   /** Not emitted by buildManifest(); allowed by the schema for other producers. */
   assertions?: ManifestAssertion[];
+  /** Optional manifest-2.1 campaign evidence block. Absent on 2.0 bundles. */
+  scenario_evidence?: ScenarioEvidence;
 }
 
 /**
@@ -185,6 +234,12 @@ export interface BuildManifestOptions {
   cli?: string;
   /** Basenames to skip in the artifacts walk. Default: ["manifest.json", "context.md"]. */
   excludeFiles?: string[];
+  /**
+   * Optional manifest-2.1 scenario_evidence block. Unlike the equivalence
+   * facet, a malformed block makes buildManifest THROW (it is the campaign's
+   * payload of record — fail loud, never silently drop it).
+   */
+  scenarioEvidence?: ScenarioEvidence;
 }
 
 /**
@@ -194,3 +249,20 @@ export interface BuildManifestOptions {
  * @returns the manifest object and the absolute path it was written to.
  */
 export function buildManifest(opts: BuildManifestOptions): { manifest: EvidenceManifest; path: string };
+
+/** One contract violation reported by validateManifest(). */
+export interface ManifestViolation {
+  /** Dotted path of the offending field, e.g. "scenario_evidence.claim_level". */
+  field: string;
+  message: string;
+}
+
+/**
+ * Validate an evidence manifest against the contract
+ * (docs/SCHEMA-CONTRACT.md, "The evidence-manifest contract"). Non-throwing —
+ * the reviewer-side entry point: validate a bundle BEFORE grading it, and
+ * grade a schema-fail bundle INCONCLUSIVE (never PASS/FAIL). A 2.0.0 manifest
+ * (no scenario_evidence block) validates clean; 2.1 rules apply only when the
+ * block is present. Accepts unknown input by design (`m` may come off disk).
+ */
+export function validateManifest(m: unknown): { ok: boolean; violations: ManifestViolation[] };
