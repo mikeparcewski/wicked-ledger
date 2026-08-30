@@ -108,7 +108,7 @@ clock — never on `package.json`'s.
 
 | manifest_version | Change |
 |---|---|
-| `1.0.0` | Initial shape (inherited from the retired wicked-testing package). |
+| `1.0.0` | Initial shape (inherited from the retired wicked-testing package). <!-- historical --> |
 | `1.1.0` | Optional `verdict.equivalence` facet (baseline-match provenance). Minor. |
 | `2.0.0` | `environment.wicked_testing_version` → `environment.qe_version` (Phase 6c retirement) — required-field rename, major. |
 | `2.1.0` | Optional `scenario_evidence` block + first-class `claim_level` enum (TH-5, qe campaign). Minor — **2.0.0 bundles stay valid.** |
