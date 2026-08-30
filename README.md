@@ -9,12 +9,14 @@ Dual-write by design: canonical JSON is the source of truth, a `better-sqlite3`
 index makes it queryable, and the two are kept in agreement (JSON writes first;
 the index degrades gracefully to JSON-only if the native module can't load).
 
+<!-- historical -->
 > **Provenance.** These modules were extracted from the (now retired)
 > `wicked-testing` package's self-contained ledger lib (Stage 1 of the
 > evidence-ledger → infra carve). Phase 6c completed the fold: the consumers
 > (`wicked-crew`, `wicked-garden`'s qe skills) read and write through this
 > package, and the wicked-testing name survives only in legacy on-disk
 > artifacts (see the decision note below).
+<!-- /historical -->
 
 > **Decision note — on-disk root rename (Phase 6c).** The ledger root renamed
 > `.wicked-testing/` → **`.wicked-qe/`** with **dual-read**: `resolveLedgerRoot`
@@ -22,7 +24,7 @@ the index degrades gracefully to JSON-only if the native module can't load).
 > `<base>/.wicked-testing` (that store keeps its root — reads AND writes — so a
 > ledger never splits across two dirs), and new repos get `.wicked-qe`. The
 > derived SQLite index follows the same rule (`wicked-qe.db` for new stores; an
-> existing `wicked-testing.db` is reused). The evidence-manifest schema bumped
+> existing `wicked-testing.db` is reused). The evidence-manifest schema bumped <!-- historical: legacy index filename an existing store keeps (dual-read contract) -->
 > to `manifest_version` **2.0.0**: `environment.wicked_testing_version` →
 > `environment.qe_version` (1.x manifests on disk keep the old key — consumers
 > gate on `manifest_version`). Bus events now stamp `domain: "qe"` and payload
