@@ -8,6 +8,18 @@ and gate **readers** (re-derive "done" from recorded evidence) both build on.
 Dual-write by design: canonical JSON is the source of truth, a `better-sqlite3`
 index makes it queryable, and the two are kept in agreement (JSON writes first;
 the index degrades gracefully to JSON-only if the native module can't load).
+"In agreement" is an enforced invariant, not a hope: every `create` / `update`
+validates the full record it is about to write (verdict enum, required fields,
+foreign keys) before touching either store, and if the index ever falls behind
+canonical JSON (an index write failed, a crash between the two writes, a
+JSON-only process wrote beside an index) the store stops serving index rows —
+`get` / `list` read canonical JSON, `stats()` reports `index_coherent: false`
+with the reason, a durable `index-drift.json` marker tells other processes,
+and the next open (or `rebuildIndex()`) reconciles the index from JSON. A
+ledger whose index was written by a **newer** wicked-ledger refuses every write
+with `ERR_INDEX_NEWER_VERSION` (reads still work from JSON). Callers that run
+`buildOracleQuery` SQL against the index themselves should check
+`stats().index_coherent` first.
 
 <!-- historical -->
 > **Provenance.** These modules were extracted from the (now retired)
@@ -38,7 +50,9 @@ npm install wicked-ledger
 
 Runtime dependency: [`better-sqlite3`](https://github.com/WiseLibs/better-sqlite3)
 `^13` (a native module; ships prebuilt binaries for common platforms, and the
-store falls back to JSON-only if it fails to load). Requires Node `>= 20`.
+store falls back to JSON-only if it fails to load). Requires Node `>= 22` —
+the floor `better-sqlite3 ^13` itself declares, so the native index is
+supported on every advertised Node (`test/coherence.mjs` pins the two together).
 
 ## Quick start
 
@@ -96,7 +110,8 @@ grading rule.
 ## Test
 
 ```sh
-npm test   # node test/smoke.mjs — migration round-trip + oracle query + manifest
+npm test   # test/smoke.mjs — migration round-trip + oracle query + manifest
+           # test/coherence.mjs — JSON/index coherence, newer-index write refusal, Node floor (native better-sqlite3)
 ```
 
 ## License

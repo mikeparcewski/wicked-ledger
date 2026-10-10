@@ -51,9 +51,12 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
   `row_counts` oracle queries.
 - `lib/domain-store.mjs` also carries a `SCHEMA_VERSION` constant (currently
   `3`) that MUST equal the highest migration on disk. It powers a
-  **forward-compat lockout**: a store refuses to open a ledger whose recorded
+  **forward-compat lockout**: a store opened on a ledger whose recorded
   version is *greater* than the code's `SCHEMA_VERSION` (a newer writer wrote it;
-  this older code must not touch it).
+  this older code must not touch it) refuses every `create` / `update` /
+  `delete` with `ERR_INDEX_NEWER_VERSION` — it does **not** degrade to
+  JSON-only writes — while reads stay available from canonical JSON, and
+  `stats()` reports `index_state: "newer-version"`, `writable: false`.
 
 ## Additive-only rule
 

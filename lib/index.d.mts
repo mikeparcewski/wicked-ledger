@@ -30,6 +30,7 @@ export type {
   UpdateInput,
   ListParams,
   DomainStoreStats,
+  IndexState,
 } from "./domain-store.mjs";
 
 // --- WICKED_RUNTIME profile resolution (foundation team-profile seam) ---

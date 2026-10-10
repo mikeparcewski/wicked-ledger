@@ -143,6 +143,9 @@ export function _domainStoreSurface(): void {
   const stats: DomainStoreStats = store.stats();
   if (stats.mode === "sqlite+json") expectType<number>(stats.schema_version);
   expectType<Record<TableName, number>>(stats.counts);
+  expectType<boolean>(stats.index_coherent);
+  expectType<"coherent" | "drifted" | "unavailable" | "newer-version">(stats.index_state);
+  expectType<boolean>(stats.writable);
   expectType<StoreMode>(store.mode);
   store.close();
   __resetDomainStoreCacheForTests();
