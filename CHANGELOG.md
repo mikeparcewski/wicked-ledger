@@ -5,6 +5,22 @@ the on-disk SQLite `schema_version` and the evidence-manifest `manifest_version`
 — move on their own clocks; see [docs/SCHEMA-CONTRACT.md](docs/SCHEMA-CONTRACT.md).
 Each release entry states both, so a consumer can read compat at a glance.
 
+## [0.5.0] — 2026-10-10
+
+Contracts: `schema_version` **3** (unchanged) and `manifest_version` **2.1.0** (unchanged).
+
+### Fixed
+- **Merged records are validated before any write** (FND-LDG-01, #10): verdict enum, required
+  columns, foreign keys and unique keys.
+- **JSON/index coherence** (FND-LDG-01): divergence is detected through a per-write intent log
+  and the durable `index-drift.json`. It is surfaced in `stats()`, never served from the index, and
+  reconciled on open.
+- **A newer-version index refuses writes** with `ERR_INDEX_NEWER_VERSION`, instead of degrading
+  to JSON-only writes (#12).
+
+### Changed
+- **`engines.node` is now `>=22`**, the floor of better-sqlite3 ^13 (FND-LDG-03, #11).
+
 ## [0.4.0] — 2026-08-29
 
 Contracts: `schema_version` **3** (unchanged — no new migrations),
