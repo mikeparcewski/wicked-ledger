@@ -130,9 +130,28 @@ export type UpdateInput<T extends TableName> = Partial<Omit<TableRecordMap[T], k
 /** list()/search() equality filters — non-schema keys are ignored (column allowlist). */
 export type ListParams<T extends TableName> = Partial<TableRecordMap[T]>;
 
+/**
+ * Index coherence state (FND-LDG-01): "coherent" — the index agrees with
+ * canonical JSON and serves reads; "drifted" — they diverged, reads come from
+ * JSON until rebuildIndex()/reopen; "unavailable" — no native index;
+ * "newer-version" — the index belongs to a newer ledger and writes are refused.
+ */
+export type IndexState = "coherent" | "drifted" | "unavailable" | "newer-version";
+
 export type DomainStoreStats =
-  | { mode: "json-only"; counts: Record<TableName, number>; drift_count: number }
-  | { mode: "sqlite+json"; counts: Record<TableName, number>; schema_version: number; drift_count: number };
+  | {
+      mode: "json-only"; counts: Record<TableName, number>; drift_count: number;
+      index_coherent: false; index_state: "unavailable" | "newer-version";
+      /** false when a newer-version index refuses writes (ERR_INDEX_NEWER_VERSION). */
+      writable: boolean; refusal?: string;
+    }
+  | {
+      mode: "sqlite+json"; counts: Record<TableName, number>; schema_version: number; drift_count: number;
+      index_coherent: boolean; index_state: "coherent" | "drifted";
+      /** Why the index was declared incoherent (present when index_coherent is false). */
+      drift_reason?: string;
+      writable: true;
+    };
 
 /**
  * Dual-write domain store: canonical JSON files + a better-sqlite3 index,
@@ -143,7 +162,10 @@ export type DomainStoreStats =
  *
  * Error codes thrown by CRUD methods:
  *  - ERR_INVALID_SOURCE      — table name outside the allowlist
- *  - ERR_INVALID_VERDICT     — verdicts.create with an out-of-enum verdict
+ *  - ERR_INVALID_VERDICT     — verdicts.create/update whose (merged) record has an out-of-enum or missing verdict
+ *  - ERR_INVALID_RECORD      — create/update whose (merged) record misses a required column or has a dangling foreign key
+ *  - ERR_INDEX_NEWER_VERSION — any write while the index belongs to a newer wicked-ledger (reads still work)
+ *  - ERR_REBUILD_INCOMPLETE  — rebuildIndex() could not index every canonical JSON record
  *  - ERR_JSON_WRITE_FAILED   — canonical JSON store unavailable (EACCES/ENOSPC/...)
  *  - ERR_SQLITE_UNAVAILABLE  — rebuildIndex() without a SQLite handle
  *  - ERR_REBUILD_FK_VIOLATION — rebuildIndex() left orphan rows

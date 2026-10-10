@@ -37,7 +37,7 @@
   "main": "./lib/index.mjs",
   "types": "./lib/index.d.mts",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "license": "MIT",
   "author": "Mike Parcewski",
@@ -72,7 +72,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node test/smoke.mjs",
+    "test": "node test/smoke.mjs && node test/coherence.mjs",
     "typecheck": "tsc -p test/types/tsconfig.json"
   },
   "dependencies": {
