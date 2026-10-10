@@ -102,6 +102,15 @@ process.stdout.write("FND-LDG-01 — merged-record validation before any write\n
     assert.equal(res.id, verdict.id);
     assert.equal(jsonOf(root, "verdicts", verdict.id).id, verdict.id);
   });
+  check("update cannot null or rewrite store-managed fields (created_at, deleted)", () => {
+    const before = jsonOf(root, "verdicts", verdict.id);
+    store.update("verdicts", verdict.id, { created_at: null, deleted: null, deleted_at: "x" });
+    const after = jsonOf(root, "verdicts", verdict.id);
+    assert.equal(after.created_at, before.created_at);
+    assert.equal(after.deleted, 0);
+    assert.equal(after.deleted_at, null);
+    assert.equal(store.stats().drift_count, 0);
+  });
   check("a valid update still lands in JSON and the index (positive control)", () => {
     const res = store.update("verdicts", verdict.id, { verdict: "FAIL", reason: "regressed" });
     assert.equal(res.verdict, "FAIL");
@@ -179,6 +188,37 @@ process.stdout.write("FND-LDG-01 — interrupted JSON-first write (JSON advanced
     assert.equal(store.stats().index_coherent, false);
   });
   store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
+process.stdout.write("FND-LDG-01 — divergence with an unchanged updated_at, and a marker from another process\n");
+{
+  const { root, store } = freshStore();
+  const { run, verdict } = seed(store);
+  const j = jsonOf(root, "verdicts", verdict.id);
+  j.verdict = "FAIL"; // same updated_at
+  writeFileSync(join(root, "verdicts", `${verdict.id}.json`), JSON.stringify(j));
+  check("get() compares every indexed column, not only updated_at", () => {
+    assert.equal(quiet(() => store.get("verdicts", verdict.id)).verdict, "FAIL");
+    assert.equal(store.stats().index_coherent, false);
+  });
+  store.close();
+  __resetDomainStoreCacheForTests();
+  const a = createDomainStore({ root }); // reconciles on open
+  check("reopen reconciled the same-timestamp divergence", () => {
+    assert.equal(a.stats().index_coherent, true);
+    assert.equal(a.list("verdicts", { run_id: run.id })[0].verdict, "FAIL");
+  });
+  // Another process marks drift while this instance is open.
+  writeFileSync(join(root, "index-drift.json"), JSON.stringify({ reason: "other process" }));
+  const k = jsonOf(root, "verdicts", verdict.id);
+  k.verdict = "PASS"; k.updated_at = new Date(Date.now() + 5000).toISOString();
+  writeFileSync(join(root, "verdicts", `${verdict.id}.json`), JSON.stringify(k));
+  check("an open instance honours another process's drift marker on list()", () => {
+    assert.equal(a.list("verdicts", { run_id: run.id })[0].verdict, "PASS");
+    assert.equal(a.stats().index_coherent, false);
+  });
+  a.close();
   rmSync(root, { recursive: true, force: true });
 }
 
