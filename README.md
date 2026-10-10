@@ -10,9 +10,10 @@ index makes it queryable, and the two are kept in agreement (JSON writes first;
 the index degrades gracefully to JSON-only if the native module can't load).
 "In agreement" is an enforced invariant, not a hope: every `create` / `update`
 validates the full record it is about to write (verdict enum, required fields,
-foreign keys) before touching either store, and if the index ever falls behind
-canonical JSON (an index write failed, a crash between the two writes, a
-JSON-only process wrote beside an index) the store stops serving index rows —
+foreign keys, unique keys) before touching either store, and if the index ever falls behind
+canonical JSON (an index write failed, a crash between the two writes — caught
+by a per-write intent file under `.index-intent/` — a JSON-only process wrote
+beside an index) the store stops serving index rows —
 `get` / `list` read canonical JSON, `stats()` reports `index_coherent: false`
 with the reason, a durable `index-drift.json` marker tells other processes,
 and the next open (or `rebuildIndex()`) reconciles the index from JSON. A

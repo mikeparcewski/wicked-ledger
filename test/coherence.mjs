@@ -222,6 +222,56 @@ process.stdout.write("FND-LDG-01 — divergence with an unchanged updated_at, an
   rmSync(root, { recursive: true, force: true });
 }
 
+process.stdout.write("FND-LDG-01 — crash window, fresh index beside JSON, uniqueness, stats()\n");
+{
+  const { root, store } = freshStore();
+  const { project, run, verdict } = seed(store);
+  check("duplicate project name is rejected before any write (UNIQUE)", () => {
+    throwsCode(() => store.create("projects", { name: "coherence" }), "ERR_INVALID_RECORD");
+    assert.equal(store.stats().drift_count, 0);
+  });
+  check("an update into a duplicate (project_id, name) scenario is rejected", () => {
+    const other = store.create("scenarios", { project_id: project.id, name: "s2", format_version: "1.0" });
+    throwsCode(() => store.update("scenarios", other.id, { name: "s" }), "ERR_INVALID_RECORD");
+  });
+  check("no intent files linger after successful writes", () => {
+    const dir = join(root, ".index-intent");
+    assert.ok(!existsSync(dir) || readdirSync(dir).length === 0);
+  });
+  // A writer that died after its JSON write and before its index write:
+  // its intent file survives with a pid that is no longer alive.
+  const j = jsonOf(root, "verdicts", verdict.id);
+  j.verdict = "FAIL"; j.updated_at = new Date(Date.now() + 1000).toISOString();
+  writeFileSync(join(root, "verdicts", `${verdict.id}.json`), JSON.stringify(j));
+  writeFileSync(join(root, ".index-intent", "2147483646-dead-writer"), "");
+  check("stats() reports the interrupted write before any read touched the row", () => {
+    assert.equal(quiet(() => store.stats()).index_coherent, false);
+  });
+  check("list() serves canonical JSON after an interrupted write (stale intent)", () => {
+    assert.equal(store.list("verdicts", { run_id: run.id })[0].verdict, "FAIL");
+  });
+  store.close();
+  __resetDomainStoreCacheForTests();
+  const again = createDomainStore({ root });
+  check("reopen reconciles the interrupted write and clears the stale intent", () => {
+    assert.equal(again.stats().index_coherent, true);
+    assert.equal(indexRow(root, "verdicts", verdict.id).verdict, "FAIL");
+    assert.equal(readdirSync(join(root, ".index-intent")).length, 0);
+  });
+  again.close();
+  // Canonical JSON written while no index existed (a JSON-only process on a
+  // fresh store): the first native open must index it, not trust an empty db.
+  for (const f of ["wicked-qe.db", "wicked-qe.db-wal", "wicked-qe.db-shm"]) rmSync(join(root, f), { force: true });
+  __resetDomainStoreCacheForTests();
+  const fresh = createDomainStore({ root });
+  check("a freshly created index beside existing JSON is rebuilt on open", () => {
+    assert.equal(fresh.list("verdicts", { run_id: run.id }).length, 1);
+    assert.equal(indexRow(root, "verdicts", verdict.id).verdict, "FAIL");
+  });
+  fresh.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
 process.stdout.write("newer-index fallback — a newer-version DB refuses writes\n");
 {
   const { root, store } = freshStore();
