@@ -5,6 +5,20 @@ the on-disk SQLite `schema_version` and the evidence-manifest `manifest_version`
 — move on their own clocks; see [docs/SCHEMA-CONTRACT.md](docs/SCHEMA-CONTRACT.md).
 Each release entry states both, so a consumer can read compat at a glance.
 
+## [0.6.0] — 2026-10-11
+
+Contracts: `schema_version` **3** (unchanged) and `manifest_version` **2.1.0** (unchanged).
+
+### Added
+- **`resolveLedgerRoot` honours `WICKED_QE_LEDGER_DIR`** (wicked-crew#951): a non-blank value pins
+  the root, absolute as given and relative under the base, with no dual-read probing. These are
+  the semantics crew's acceptance reader and garden's QE runner already use. A governed crew run
+  hands its QE unit an absolute pin outside the worktree, so `createDomainStore()` there records
+  the verdict where crew's acceptance check reads it, not in the tree under review. The new
+  optional `env` argument defaults to `process.env`. `LEDGER_DIR_ENV` is exported.
+- The type barrel (`lib/index.d.mts`) now declares `resolveLedgerRoot`, `LEDGER_DIRNAME`,
+  `LEGACY_LEDGER_DIRNAME` and `LEDGER_DIR_ENV`, which the runtime barrel already exported.
+
 ## [0.5.0] — 2026-10-10
 
 Contracts: `schema_version` **3** (unchanged) and `manifest_version` **2.1.0** (unchanged).
