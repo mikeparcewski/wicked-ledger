@@ -242,16 +242,17 @@ try {
   });
 
   check("resolveLedgerRoot dual-read: new name wins, legacy honored, default new", () => {
+    // `{}` env: the dual-read is judged with no WICKED_QE_LEDGER_DIR pin, whatever the ambient env holds
     const base = join(root, "resolve-bed");
     mkdirSync(base, { recursive: true });
     // no dirs: default to the new name
-    assert.equal(resolveLedgerRoot(base), join(base, LEDGER_DIRNAME));
+    assert.equal(resolveLedgerRoot(base, {}), join(base, LEDGER_DIRNAME));
     // legacy only: legacy root is honored
     mkdirSync(join(base, LEGACY_LEDGER_DIRNAME), { recursive: true });
-    assert.equal(resolveLedgerRoot(base), join(base, LEGACY_LEDGER_DIRNAME));
+    assert.equal(resolveLedgerRoot(base, {}), join(base, LEGACY_LEDGER_DIRNAME));
     // both present: the new name wins
     mkdirSync(join(base, LEDGER_DIRNAME), { recursive: true });
-    assert.equal(resolveLedgerRoot(base), join(base, LEDGER_DIRNAME));
+    assert.equal(resolveLedgerRoot(base, {}), join(base, LEDGER_DIRNAME));
   });
 
   check("resolveLedgerRoot: WICKED_QE_LEDGER_DIR pins the root (absolute as given, relative under base)", () => {
