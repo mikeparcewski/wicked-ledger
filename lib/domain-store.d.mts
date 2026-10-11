@@ -210,7 +210,8 @@ export class DomainStore {
 /**
  * Factory: returns the per-resolved-root singleton DomainStore.
  *
- * @param opts.root Store root directory (default: `resolveLedgerRoot(process.cwd())` —
+ * @param opts.root Store root directory (default: `resolveLedgerRoot(process.cwd())` — a
+ *   `WICKED_QE_LEDGER_DIR` pin, else
  *   `<cwd>/.wicked-qe`, falling back to a legacy `<cwd>/.wicked-testing` when
  *   only that exists).
  */
@@ -230,11 +231,16 @@ export const LEDGER_DIRNAME: string;
 /** Legacy dirname from the retired wicked-testing package (".wicked-testing"). */
 export const LEGACY_LEDGER_DIRNAME: string;
 
+/** The env variable that pins the ledger root ("WICKED_QE_LEDGER_DIR"). */
+export const LEDGER_DIR_ENV: string;
+
 /**
- * Dual-read root resolution (Phase 6c): `<base>/.wicked-qe` when present,
+ * Ledger root resolution: a non-blank `WICKED_QE_LEDGER_DIR` in `env`
+ * (default `process.env`) pins the root (absolute as given, relative under
+ * `base`); otherwise dual-read (Phase 6c): `<base>/.wicked-qe` when present,
  * else `<base>/.wicked-testing` when present, else `<base>/.wicked-qe`.
  */
-export function resolveLedgerRoot(base?: string): string;
+export function resolveLedgerRoot(base?: string, env?: Record<string, string | undefined>): string;
 
 /**
  * Test-only hook: drop every cached DomainStore without closing them.

@@ -15,6 +15,10 @@
 import createDomainStoreDefault, {
   DomainStore,
   createDomainStore,
+  resolveLedgerRoot,
+  LEDGER_DIR_ENV,
+  LEDGER_DIRNAME,
+  LEGACY_LEDGER_DIRNAME,
   SCHEMA_VERSION,
   __resetDomainStoreCacheForTests,
   QUERIES,
@@ -104,6 +108,11 @@ function expectType<T>(_value: T): void {}
 // Never invoked — type-level assertions only.
 export function _domainStoreSurface(): void {
   expectType<number>(SCHEMA_VERSION);
+  expectType<string>(resolveLedgerRoot());
+  expectType<string>(resolveLedgerRoot("/repo", { WICKED_QE_LEDGER_DIR: "/run/.wicked-qe" }));
+  expectType<string>(LEDGER_DIR_ENV);
+  expectType<string>(LEDGER_DIRNAME);
+  expectType<string>(LEGACY_LEDGER_DIRNAME);
 
   const store: DomainStore = createDomainStore({ root: "/tmp/.wicked-qe" });
   expectType<DomainStore>(createDomainStore());

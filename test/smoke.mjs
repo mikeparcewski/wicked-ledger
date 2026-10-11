@@ -23,6 +23,7 @@ import { createRequire } from "node:module";
 import {
   createDomainStore,
   resolveLedgerRoot,
+  LEDGER_DIR_ENV,
   LEDGER_DIRNAME,
   LEGACY_LEDGER_DIRNAME,
   SCHEMA_VERSION,
@@ -241,16 +242,38 @@ try {
   });
 
   check("resolveLedgerRoot dual-read: new name wins, legacy honored, default new", () => {
+    // `{}` env: the dual-read is judged with no WICKED_QE_LEDGER_DIR pin, whatever the ambient env holds
     const base = join(root, "resolve-bed");
     mkdirSync(base, { recursive: true });
     // no dirs: default to the new name
-    assert.equal(resolveLedgerRoot(base), join(base, LEDGER_DIRNAME));
+    assert.equal(resolveLedgerRoot(base, {}), join(base, LEDGER_DIRNAME));
     // legacy only: legacy root is honored
     mkdirSync(join(base, LEGACY_LEDGER_DIRNAME), { recursive: true });
-    assert.equal(resolveLedgerRoot(base), join(base, LEGACY_LEDGER_DIRNAME));
+    assert.equal(resolveLedgerRoot(base, {}), join(base, LEGACY_LEDGER_DIRNAME));
     // both present: the new name wins
     mkdirSync(join(base, LEDGER_DIRNAME), { recursive: true });
-    assert.equal(resolveLedgerRoot(base), join(base, LEDGER_DIRNAME));
+    assert.equal(resolveLedgerRoot(base, {}), join(base, LEDGER_DIRNAME));
+  });
+
+  check("resolveLedgerRoot: WICKED_QE_LEDGER_DIR pins the root (absolute as given, relative under base)", () => {
+    const base = join(root, "resolve-bed"); // holds both dirnames from the check above
+    const pinned = join(root, "run-evidence", ".wicked-qe");
+    assert.equal(LEDGER_DIR_ENV, "WICKED_QE_LEDGER_DIR");
+    // an absolute pin wins over an existing <base>/.wicked-qe: a governed run's verdict never targets the tree
+    assert.equal(resolveLedgerRoot(base, { WICKED_QE_LEDGER_DIR: pinned }), pinned);
+    assert.equal(resolveLedgerRoot(base, { WICKED_QE_LEDGER_DIR: "  qe-elsewhere " }), join(base, "qe-elsewhere"));
+    // blank = unset: dual-read as before
+    assert.equal(resolveLedgerRoot(base, { WICKED_QE_LEDGER_DIR: "  " }), join(base, LEDGER_DIRNAME));
+    assert.equal(resolveLedgerRoot(base, {}), join(base, LEDGER_DIRNAME));
+    // the default env is process.env
+    const prev = process.env.WICKED_QE_LEDGER_DIR;
+    process.env.WICKED_QE_LEDGER_DIR = pinned;
+    try {
+      assert.equal(resolveLedgerRoot(base), pinned);
+    } finally {
+      if (prev === undefined) delete process.env.WICKED_QE_LEDGER_DIR;
+      else process.env.WICKED_QE_LEDGER_DIR = prev;
+    }
   });
 
   // --- manifest 2.1: scenario_evidence + claim_level (TH-5) ---

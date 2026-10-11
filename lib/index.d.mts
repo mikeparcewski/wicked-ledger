@@ -11,6 +11,10 @@
 export {
   DomainStore,
   createDomainStore,
+  resolveLedgerRoot,
+  LEDGER_DIR_ENV,
+  LEDGER_DIRNAME,
+  LEGACY_LEDGER_DIRNAME,
   SCHEMA_VERSION,
   __resetDomainStoreCacheForTests,
 } from "./domain-store.mjs";
