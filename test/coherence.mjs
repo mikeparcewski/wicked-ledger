@@ -306,6 +306,269 @@ process.stdout.write("newer-index fallback — a newer-version DB refuses writes
   rmSync(root, { recursive: true, force: true });
 }
 
+process.stdout.write("F23 — get/list/search return the canonical record's stamps beyond the schema columns\n");
+{
+  const { root, store } = freshStore();
+  assert.equal(store.mode, "sqlite+json", "native index must be active for this test");
+  const project = store.create("projects", { name: "stamps" });
+  const scenario = store.create("scenarios", { project_id: project.id, name: "s", format_version: "1.0" });
+  const started_at = new Date().toISOString();
+  // Shaped like a governed QE run (crew run 714675e5): the run and its verdict carry the
+  // crew run id, the verdict the isolated review session. Neither has a schema column.
+  const runA = store.create("runs", { project_id: project.id, scenario_id: scenario.id, started_at, status: "running", crew_run_id: "crew-run-A" });
+  const runB = store.create("runs", { project_id: project.id, scenario_id: scenario.id, started_at, status: "running", crew_run_id: "crew-run-B" });
+  const verdictA = store.create("verdicts", { run_id: runA.id, verdict: "PASS", reviewer: "acceptance-test-reviewer", review_session: "sess-A", crew_run_id: "crew-run-A" });
+  // An old record written before any stamp existed.
+  const legacy = store.create("runs", { project_id: project.id, scenario_id: scenario.id, started_at, status: "running" });
+
+  check("the index is coherent, so reads below are index-served (not the JSON fallback)", () => {
+    assert.equal(store.stats().index_coherent, true);
+    assert.equal(existsSync(join(root, "index-drift.json")), false);
+  });
+  check("get('runs') carries crew_run_id", () => {
+    assert.equal(store.get("runs", runA.id).crew_run_id, "crew-run-A");
+    assert.equal(store.get("runs", runB.id).crew_run_id, "crew-run-B");
+  });
+  check("get('verdicts') carries review_session and crew_run_id", () => {
+    const v = store.get("verdicts", verdictA.id);
+    assert.equal(v.review_session, "sess-A");
+    assert.equal(v.crew_run_id, "crew-run-A");
+  });
+  check("additive: every index column is still served exactly as the index holds it", () => {
+    for (const [source, id] of [["runs", runA.id], ["verdicts", verdictA.id], ["runs", legacy.id]]) {
+      const got = store.get(source, id);
+      const row = indexRow(root, source, id);
+      for (const [col, val] of Object.entries(row)) assert.strictEqual(got[col], val, `${source}.${col}`);
+    }
+    assert.strictEqual(store.get("runs", runA.id).finished_at, null, "an unset column is still null, not undefined");
+  });
+  check("an old record without the stamp reads back without one (nothing invented)", () => {
+    const r = store.get("runs", legacy.id);
+    assert.equal(Object.hasOwn(r, "crew_run_id"), false);
+    assert.equal(Object.hasOwn(r, "review_session"), false);
+  });
+  check("list('verdicts', { run_id }) carries the stamps", () => {
+    const rows = store.list("verdicts", { run_id: runA.id });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].review_session, "sess-A");
+    assert.equal(rows[0].crew_run_id, "crew-run-A");
+  });
+  check("list('runs') gives each run its own stamp (no cross-record attribution)", () => {
+    const byId = Object.fromEntries(store.list("runs").map((r) => [r.id, r]));
+    assert.equal(byId[runA.id].crew_run_id, "crew-run-A");
+    assert.equal(byId[runB.id].crew_run_id, "crew-run-B");
+    assert.equal(Object.hasOwn(byId[legacy.id], "crew_run_id"), false);
+    assert.strictEqual(byId[runA.id].finished_at, null);
+  });
+  check("search() (list-backed) carries the stamps", () => {
+    assert.equal(store.search("runs", null, { project_id: project.id }).find((r) => r.id === runA.id).crew_run_id, "crew-run-A");
+  });
+  check("a stamp that is no column cannot be used as a list filter (allowlist unchanged)", () => {
+    assert.equal(store.list("runs", { crew_run_id: "crew-run-A" }).length, 3);
+  });
+  check("...and still no drift after all the reads", () => {
+    assert.equal(store.stats().index_coherent, true);
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
+process.stdout.write("F23 — list() never serves an index row its canonical JSON contradicts\n");
+{
+  const { root, store } = freshStore();
+  const { project, scenario, run } = seed(store);
+  const other = store.create("runs", { project_id: project.id, scenario_id: scenario.id, started_at: new Date().toISOString(), status: "running", crew_run_id: "crew-run-other" });
+  // Out-of-band canonical change the index never saw: the run finished.
+  const path = join(root, "runs", `${run.id}.json`);
+  writeFileSync(path, JSON.stringify({ ...jsonOf(root, "runs", run.id), status: "passed" }));
+  check("list filtered on the stale column answers from canonical JSON", () => {
+    const rows = quiet(() => store.list("runs", { status: "running" }));
+    assert.deepEqual(rows.map((r) => r.id), [other.id]);
+    assert.equal(rows[0].crew_run_id, "crew-run-other");
+  });
+  check("...and marks drift durably", () => {
+    assert.equal(store.stats().index_coherent, false);
+    assert.equal(existsSync(join(root, "index-drift.json")), true);
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
+process.stdout.write("F23 — list() drops a row whose canonical JSON is gone\n");
+{
+  const { root, store } = freshStore();
+  const { run } = seed(store);
+  rmSync(join(root, "runs", `${run.id}.json`));
+  check("the index row is not served once its JSON is gone", () => {
+    assert.deepEqual(quiet(() => store.list("runs")), []);
+    assert.equal(store.stats().index_coherent, false);
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
+process.stdout.write("F23 — index-served records: columns from the index, identity checked, extras from JSON\n");
+{
+  const { root, store } = freshStore();
+  const { project, scenario, run } = seed(store);
+  const stamped = store.create("runs", { project_id: project.id, scenario_id: scenario.id, started_at: new Date().toISOString(), status: "running", crew_run_id: "canonical-A" });
+  check("an agreeing column keeps the index's value and type (JSON reason 42 is served as the index's text)", () => {
+    const v = store.create("verdicts", { run_id: run.id, verdict: "PASS", reviewer: "r", reason: 42, review_session: "s" });
+    const indexed = indexRow(root, "verdicts", v.id).reason;
+    assert.equal(typeof indexed, "string", "TEXT affinity stores the number as text");
+    assert.strictEqual(store.get("verdicts", v.id).reason, indexed);
+    assert.strictEqual(store.list("verdicts", { run_id: run.id }).find((x) => x.id === v.id).reason, indexed);
+    assert.equal(store.get("verdicts", v.id).review_session, "s");
+    assert.equal(store.stats().index_coherent, true);
+  });
+  check("an index column outside the schema cannot override a canonical stamp", () => {
+    const db = new Database(join(root, "wicked-qe.db"));
+    try {
+      db.exec("ALTER TABLE runs ADD COLUMN crew_run_id TEXT");
+      db.prepare("UPDATE runs SET crew_run_id = 'stale-index-B'").run();
+    } finally { db.close(); }
+    assert.equal(store.get("runs", stamped.id).crew_run_id, "canonical-A");
+    assert.equal(store.list("runs").find((r) => r.id === stamped.id).crew_run_id, "canonical-A");
+    assert.equal(Object.hasOwn(store.get("runs", run.id), "crew_run_id"), false, "an unstamped run gains no stamp from the index");
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
+process.stdout.write("F23 — a record whose JSON names another id is not served\n");
+{
+  const { root, store } = freshStore();
+  const { project, scenario } = seed(store);
+  const r = store.create("runs", { id: "01", project_id: project.id, scenario_id: scenario.id, started_at: new Date().toISOString(), status: "running" });
+  // Hand-edited: same columns, but the file now claims id 1 and carries a stamp.
+  writeFileSync(join(root, "runs", "01.json"), JSON.stringify({ ...jsonOf(root, "runs", r.id), id: 1, crew_run_id: "crew-1" }));
+  check("indexed list('runs') (first read, index coherent) does not serve it, and marks drift", () => {
+    assert.equal(store.stats().index_coherent, true);
+    const rows = quiet(() => store.list("runs"));
+    assert.equal(rows.some((x) => x.crew_run_id === "crew-1" || x.id === "01" || x.id === 1), false);
+    assert.equal(existsSync(join(root, "index-drift.json")), true);
+  });
+  check("get('runs', '01') does not serve the forged stamp (JSON fallback)", () => {
+    assert.equal(quiet(() => store.get("runs", "01")), null);
+  });
+  check("a rebuild indexes exactly what reads serve: coherent, and the file is still not a record", () => {
+    quiet(() => store.rebuildIndex());
+    assert.equal(store.stats().index_coherent, true);
+    assert.equal(indexRow(root, "runs", "1"), undefined);
+    assert.equal(indexRow(root, "runs", "01"), undefined);
+    assert.equal(store.list("runs").some((x) => x.crew_run_id === "crew-1"), false);
+    assert.equal(store.stats().index_coherent, true, "the next indexed read finds nothing to contradict");
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const { root, store } = freshStore();
+  const { project, scenario } = seed(store);
+  store.create("runs", { id: "01", project_id: project.id, scenario_id: scenario.id, started_at: new Date().toISOString(), status: "running" });
+  writeFileSync(join(root, "runs", "01.json"), JSON.stringify({ ...jsonOf(root, "runs", "01"), id: 1, crew_run_id: "crew-1" }));
+  check("indexed get('runs', '01') (first read) does not serve it, and marks drift", () => {
+    assert.equal(quiet(() => store.get("runs", "01")), null);
+    assert.equal(existsSync(join(root, "index-drift.json")), true);
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
+process.stdout.write("F23 — ids are strings: create refuses others; a legacy numeric id is served from JSON only\n");
+{
+  const { root, store } = freshStore();
+  const { project, scenario } = seed(store);
+  const base = { project_id: project.id, scenario_id: scenario.id, started_at: new Date().toISOString(), status: "running" };
+  check("create refuses a numeric, zero or empty id (nothing written)", () => {
+    const before = readdirSync(join(root, "runs")).length;
+    for (const id of [1, 0, ""]) throwsCode(() => store.create("runs", { ...base, id }), "ERR_INVALID_RECORD");
+    assert.equal(readdirSync(join(root, "runs")).length, before);
+  });
+  // A legacy record with a numeric id, written as an older ledger would have:
+  // canonical 1.json { id: 1 }, and the index holds the id as better-sqlite3 binds it.
+  const legacy = { ...base, id: 1, crew_run_id: "crew-A", created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z", deleted: 0, deleted_at: null };
+  writeFileSync(join(root, "runs", "1.json"), JSON.stringify(legacy));
+  const db = new Database(join(root, "wicked-qe.db"));
+  let indexedId;
+  try {
+    db.prepare("INSERT INTO runs (id, project_id, scenario_id, started_at, status, created_at, updated_at, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, 0)")
+      .run(1, base.project_id, base.scenario_id, base.started_at, base.status, legacy.created_at, legacy.updated_at);
+    indexedId = db.prepare("SELECT id FROM runs WHERE id = ?").get(1)?.id;
+  } finally { db.close(); }
+  check("get(1) never merges the stamp under the index's other spelling of the id", () => {
+    const got = quiet(() => store.get("runs", 1));
+    assert.equal(got.crew_run_id, "crew-A");
+    assert.equal(String(got.id), "1", `served id ${got.id} must be the canonical id (index held ${indexedId})`);
+  });
+  check("a rebuild does not re-declare coherence over it, and reads keep serving it from JSON", () => {
+    throwsCode(() => quiet(() => store.rebuildIndex()), "ERR_REBUILD_INCOMPLETE");
+    assert.equal(store.stats().index_coherent, false);
+    assert.equal(store.list("runs").find((x) => String(x.id) === "1").crew_run_id, "crew-A");
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
+process.stdout.write("F23 — an index row with no canonical JSON (null id) falls back, not truncates\n");
+{
+  const { root, store } = freshStore();
+  const { project, scenario, run } = seed(store);
+  const db = new Database(join(root, "wicked-qe.db"));
+  try {
+    db.pragma("foreign_keys = OFF");
+    // Newest-first ordering puts this phantom row ahead of the real one.
+    db.prepare("INSERT INTO runs (id, project_id, scenario_id, started_at, status, created_at, updated_at, deleted) VALUES (NULL, ?, ?, ?, 'running', '9999-01-01T00:00:00.000Z', '9999-01-01T00:00:00.000Z', 0)")
+      .run(project.id, scenario.id, new Date().toISOString());
+  } finally { db.close(); }
+  check("list('runs') serves the canonical runs and marks drift", () => {
+    const rows = quiet(() => store.list("runs"));
+    assert.deepEqual(rows.map((x) => x.id), [run.id]);
+    assert.equal(store.stats().index_coherent, false);
+    assert.equal(existsSync(join(root, "index-drift.json")), true);
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
+process.stdout.write("F23 — create() with an explicit undefined id still mints one\n");
+{
+  const { root, store } = freshStore();
+  const { project, scenario } = seed(store);
+  const base = { project_id: project.id, scenario_id: scenario.id, started_at: new Date().toISOString(), status: "running" };
+  const a = store.create("runs", { ...base, id: undefined, crew_run_id: "crew-A" });
+  const b = store.create("runs", { ...base, id: undefined, crew_run_id: "crew-B" });
+  check("two creates get two distinct ids and two files (no shared undefined.json)", () => {
+    assert.equal(typeof a.id, "string");
+    assert.notEqual(a.id, b.id);
+    assert.equal(existsSync(join(root, "runs", "undefined.json")), false);
+    assert.equal(store.get("runs", a.id).crew_run_id, "crew-A");
+    assert.equal(store.get("runs", b.id).crew_run_id, "crew-B");
+    assert.equal(store.stats().index_coherent, true);
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
+process.stdout.write("F23 — the JSON fallback (drifted index) still returns the stamps\n");
+{
+  const { root, store } = freshStore();
+  const { project, scenario } = seed(store);
+  const r = store.create("runs", { project_id: project.id, scenario_id: scenario.id, started_at: new Date().toISOString(), status: "running", crew_run_id: "crew-F" });
+  const db = new Database(join(root, "wicked-qe.db"));
+  try { db.pragma("foreign_keys = OFF"); db.prepare("DELETE FROM runs WHERE id = ?").run(r.id); } finally { db.close(); }
+  check("get() detects the missing row, marks drift and serves the stamped JSON", () => {
+    assert.equal(quiet(() => store.get("runs", r.id)).crew_run_id, "crew-F");
+    assert.equal(store.stats().index_coherent, false);
+  });
+  check("list() and search() on the fallback carry it too", () => {
+    assert.equal(store.list("runs").find((x) => x.id === r.id).crew_run_id, "crew-F");
+    assert.equal(store.search("runs", null).find((x) => x.id === r.id).crew_run_id, "crew-F");
+  });
+  store.close();
+  rmSync(root, { recursive: true, force: true });
+}
+
 process.stdout.write("FND-LDG-03 — advertised Node floor vs the native driver\n");
 {
   const floor = (range) => {
