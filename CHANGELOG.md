@@ -7,6 +7,8 @@ Each release entry states both, so a consumer can read compat at a glance.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-11-06
+
 ### Fixed
 - **`get` / `list` / `search` return a record's keys beyond the schema columns** (F23). With a coherent index they
   served the SQLite row alone, which has no column for caller stamps such as `crew_run_id` and `review_session`.
@@ -19,9 +21,9 @@ Each release entry states both, so a consumer can read compat at a glance.
   before). Reads never serve a JSON file whose own `id` is not the id it is stored (and indexed) under, and
   `rebuildIndex` skips such a file, so the rebuilt index holds exactly what reads serve.
 - **`create` mints an id when none is given and refuses a non-string id.** An explicit `id: undefined` in the
-  payload erased the minted id, so such records were all written to one `undefined.json`. A numeric, zero or empty
-  id (never allowed by the typed contract, `id: string`) now throws `ERR_INVALID_RECORD` before any write: the
-  index stores a number in another spelling (`1` as `"1.0"`) than its filename. A legacy record that already has a
+  payload erased the minted id, so such records were all written to one `undefined.json`. A numeric or zero id
+  (never allowed by the typed contract, `id: string`), or an empty string, now throws `ERR_INVALID_RECORD` before any
+  write: the index stores a number in another spelling (`1` as `"1.0"`) than its filename. A legacy record that already has a
   numeric id stays readable from canonical JSON; `rebuildIndex` reports it as not indexable
   (`ERR_REBUILD_INCOMPLETE`), so that store's reads stay on canonical JSON rather than flip-flopping.
 
@@ -128,3 +130,11 @@ Contracts: `schema_version` **3** (migrations 001–003), `manifest_version` **1
   wicked-testing package (#1): `DomainStore` CRUD over the 7-table SQLite
   schema, fixed-SQL oracle queries, `buildManifest`, additive migrations,
   fire-and-forget wicked-bus emission.
+
+[Unreleased]: https://github.com/mikeparcewski/wicked-ledger/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/mikeparcewski/wicked-ledger/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/mikeparcewski/wicked-ledger/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/mikeparcewski/wicked-ledger/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/mikeparcewski/wicked-ledger/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/mikeparcewski/wicked-ledger/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/mikeparcewski/wicked-ledger/compare/v0.1.1...v0.2.0
