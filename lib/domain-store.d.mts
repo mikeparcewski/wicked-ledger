@@ -32,6 +32,13 @@ export type TaskStatus = "open" | "in_progress" | "done" | "blocked";
  * column (missing values as `null`); rows read from canonical JSON carry only
  * the fields that were written (missing values as `undefined`). Optional
  * fields are therefore typed `field?: T | null`.
+ *
+ * Keys beyond the schema columns: a record keeps every key its writer gave
+ * it (for example `crew_run_id`, `review_session`). get / list / search
+ * return them, from canonical JSON, beside the index's columns. They are not
+ * declared here and cannot be list() filters (column allowlist). The index
+ * has no column for them, so the coherence check does not corroborate them:
+ * they are exactly as trustworthy as the canonical JSON file.
  */
 export interface BaseRecord {
   /** UUID (server-minted unless supplied at create). */

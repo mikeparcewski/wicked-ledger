@@ -69,7 +69,7 @@ const scenario = store.create("scenarios", { project_id: project.id, name: "chec
 const run      = store.create("runs",      { project_id: project.id, scenario_id: scenario.id, started_at: new Date().toISOString(), status: "running" });
 const verdict  = store.create("verdicts",  { run_id: run.id, verdict: "PASS", reviewer: "acceptance-test-reviewer" });
 
-store.get("verdicts", verdict.id);            // → the verdict row
+store.get("verdicts", verdict.id);            // → the verdict (with any extra keys it was created with)
 store.list("verdicts", { run_id: run.id });   // → [ verdict ]
 
 // Fixed, auditable oracle queries (no LLM-generated SQL):

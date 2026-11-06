@@ -5,6 +5,28 @@ the on-disk SQLite `schema_version` and the evidence-manifest `manifest_version`
 — move on their own clocks; see [docs/SCHEMA-CONTRACT.md](docs/SCHEMA-CONTRACT.md).
 Each release entry states both, so a consumer can read compat at a glance.
 
+## [Unreleased]
+
+### Fixed
+- **`get` / `list` / `search` return a record's keys beyond the schema columns** (F23). With a coherent index they
+  served the SQLite row alone, which has no column for caller stamps such as `crew_run_id` and `review_session`.
+  An isolated QE reviewer that resumed its run with `store.get('runs', id)` then saw no `crew_run_id` and returned
+  INCONCLUSIVE ("run attribution could not be verified"). Reads now add the canonical JSON's extra keys to the
+  index row. While the index is coherent the change is additive: every schema column keeps the value and type the
+  index served, and a record written without a stamp still reads back without one. `list` now checks each row
+  against its canonical JSON as `get` already did: a row whose JSON is missing, deleted, names another id or
+  disagrees marks drift, and the answer comes from canonical JSON (whose records carry only the keys written, as
+  before). Reads never serve a JSON file whose own `id` is not the id it is stored (and indexed) under, and
+  `rebuildIndex` skips such a file, so the rebuilt index holds exactly what reads serve.
+- **`create` mints an id when none is given and refuses a non-string id.** An explicit `id: undefined` in the
+  payload erased the minted id, so such records were all written to one `undefined.json`. A numeric, zero or empty
+  id (never allowed by the typed contract, `id: string`) now throws `ERR_INVALID_RECORD` before any write: the
+  index stores a number in another spelling (`1` as `"1.0"`) than its filename. A legacy record that already has a
+  numeric id stays readable from canonical JSON; `rebuildIndex` reports it as not indexable
+  (`ERR_REBUILD_INCOMPLETE`), so that store's reads stay on canonical JSON rather than flip-flopping.
+
+Contracts: `schema_version` **3** and `manifest_version` **2.1.0** (both unchanged).
+
 ## [0.6.0] — 2026-10-11
 
 Contracts: `schema_version` **3** (unchanged) and `manifest_version` **2.1.0** (unchanged).
